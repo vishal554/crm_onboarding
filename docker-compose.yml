@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not published to the host by default (avoids clashing with a local
+    # Postgres on 5432). Uncomment to inspect the DB from the host.
+    # ports:
+    #   - "5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Not published to the host by default (avoids clashing with a local
+    # Redis on 6379). Uncomment to inspect from the host.
+    # ports:
+    #   - "6380:6379"
+
+  web:
+    build: .
+    command: ["web"]
+    env_file: .env
+    volumes:
+      - .:/app          # live source for development
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: ["worker"]
+    env_file: .env
+    volumes:
+      - .:/app          # live source for development
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    command: ["beat"]
+    env_file: .env
+    volumes:
+      - .:/app          # live source for development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  media:

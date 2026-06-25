@@ -1,0 +1,6 @@
+Name: John Doe
+Email: john.doe@example.com
+Phone: +91 98765 43210
+Address: 45 Park Street, Andheri West, Mumbai 400058
+
+Hi team, please find my Aadhaar attached to start onboarding.

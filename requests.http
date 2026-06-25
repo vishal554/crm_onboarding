@@ -1,0 +1,128 @@
+### Sample requests (VS Code REST Client / IntelliJ HTTP client).
+### Base URL
+@base = http://localhost:8000/api
+@adminKey = dev-admin-key
+
+### Health check
+GET {{base}}/health
+
+### Ingest an inbound onboarding email (body only)
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+Hi, I'm Rahul Sharma and I'd like to onboard. Reach me at rahul@example.com
+or 9123456780. I currently stay at 45 Park Street, Mumbai.
+--boundary--
+
+### Ingest an inbound email WITH a document attachment (file upload)
+### Details match the document -> approved. See samples/sample_emails.md.
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+Name: John Doe
+Email: john.doe@example.com
+Phone: +91 98765 43210
+Address: 45 Park Street, Andheri West, Mumbai 400058
+--boundary
+Content-Disposition: form-data; name="attachments"; filename="aadhaar.png"
+Content-Type: image/png
+
+< ./samples/aadhaar_johndoe.png
+--boundary--
+
+### Mismatch: body name differs from the document -> requires_manual_review
+### (also flagged as a duplicate document - run AFTER the request above)
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+Name: Rahul Sharma
+Email: rahul.sharma@example.com
+Phone: 9123456780
+Address: 12 MG Road, Bengaluru 560001
+--boundary
+Content-Disposition: form-data; name="attachments"; filename="aadhaar.png"
+Content-Type: image/png
+
+< ./samples/aadhaar_johndoe.png
+--boundary--
+
+### Prose, no attachment -> rejected (documents missing)
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+Hi team, I'm Priya Verma and I'd like to get onboarded. Reach me at
+priya.verma@example.com or on +91 98200 11223. I stay at 21 Residency Road,
+Bengaluru, Karnataka 560025.
+--boundary--
+
+### Reply threading: send the original, then the reply (maps onto the same ticket)
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+Message-ID: <onboard-arjun-001@example.com>
+From: Arjun Nair <arjun.nair@example.com>
+
+Hi, I'd like to begin onboarding. You can reach me on 9988776655.
+--boundary--
+
+###
+POST {{base}}/email/inbound
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="body"
+
+In-Reply-To: <onboard-arjun-001@example.com>
+From: Arjun Nair <arjun.nair@example.com>
+
+Quick follow-up on my onboarding request above - thanks!
+--boundary--
+
+### List tickets (paginated, optional ?status=approved|rejected|...)
+GET {{base}}/tickets
+
+### Ticket detail (replace 1 with a real id)
+GET {{base}}/tickets/1
+
+### Ticket timeline
+GET {{base}}/tickets/1/timeline
+
+### Ticket documents
+GET {{base}}/tickets/1/documents
+
+### Update ticket status (admin - needs X-Admin-Key)
+PATCH {{base}}/tickets/1/status
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
+
+{ "status": "approved", "note": "manually approved" }
+
+### Reprocess a ticket (admin)
+POST {{base}}/tickets/1/reprocess
+X-Admin-Key: {{adminKey}}
+
+
+### --- curl equivalents -------------------------------------------------
+# curl -F "body=<samples/test1_match.txt" \
+#      -F "attachments=@samples/aadhaar_johndoe.png" \
+#      http://localhost:8000/api/email/inbound
+#
+# curl http://localhost:8000/api/tickets
+# curl -X PATCH http://localhost:8000/api/tickets/1/status \
+#      -H "Content-Type: application/json" -H "X-Admin-Key: dev-admin-key" \
+#      -d '{"status":"approved"}'

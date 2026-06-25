@@ -1,0 +1,46 @@
+flowchart TD
+    A([Inbound onboarding email]):::start --> B["POST /api/email/inbound"]
+    B --> C{"Rate limit OK?"}
+    C -->|No| C1["429 Too Many Requests"]:::err
+    C -->|Yes| D{"Attachments valid?<br/>type and size"}
+    D -->|No| D1["422 Unsupported / too large"]:::err
+    D -->|Yes| E["Compute content hash<br/>parse in-body headers"]
+    E --> F{"Duplicate email?<br/>content_hash exists"}
+    F -->|Yes| F1["Return existing ticket<br/>idempotent = true"]:::done
+    F -->|No| G{"Reply?<br/>In-Reply-To matches"}
+    G -->|Yes| G1["Map onto original ticket<br/>add reply event"]:::done
+    G -->|No| H["Create RawEmail + Ticket received<br/>+ IdempotencyKey + sla_due_at"]
+    H --> I[("Enqueue pipeline<br/>Redis broker")]
+
+    I --> J["1. store_raw_email<br/>status: processing"]
+    J --> K["2. extract_attachments<br/>hash-dedupe, store, Documents"]
+    K --> L["3. parse_user_info<br/>spaCy NER + regex"]
+    L --> M[/"notify: onboarding_received"/]:::notif
+    L --> N["4. run_document_extraction<br/>Tesseract OCR: Aadhaar/PAN/DOB"]
+    N --> O[/"notify: documents_processed"/]:::notif
+    N --> P{"5. run_validation"}
+
+    P -->|Missing docs| P1["status: rejected"]:::err
+    P1 --> P1n[/"notify: documents_missing + ticket_rejected"/]:::notif
+    P -->|Mismatch / duplicate| P2["status: requires_manual_review"]:::warn
+    P2 --> P2n[/"notify: validation_failed"/]:::notif
+    P -->|All checks pass| P3["status: approved"]:::done
+    P3 --> P3n[/"notify: validation_passed + ticket_approved"/]:::notif
+
+    K -.task error.-> R{"Retries left? (< 3)"}
+    N -.task error.-> R
+    P -.task error.-> R
+    R -->|Yes| R1["Retry w/ exp backoff + jitter"] --> K
+    R -->|No| R2[("Dead-letter queue<br/>status: failed")]:::err
+
+    SLA["Celery Beat: check_sla (every 60s)"] --> SLA1{"Past SLA &<br/>unresolved?"}
+    SLA1 -->|Yes| SLA2["flag sla_breached + event"]:::warn
+
+    ADM1["Admin: POST /tickets/{id}/reprocess"] --> I
+    ADM2["Admin: PATCH /tickets/{id}/status"] --> H2["update status + audit event"]:::done
+
+    classDef start fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef err fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef notif fill:#f3e8ff,stroke:#9333ea,color:#581c87

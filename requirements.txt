@@ -1,0 +1,24 @@
+Django==5.2.6
+django-ninja==1.4.3
+celery==5.5.3
+redis==5.2.1
+psycopg[binary]==3.2.9
+gunicorn==23.0.0
+uvicorn[standard]==0.34.0
+whitenoise==6.9.0
+
+# Document parsing / OCR (used from build step 5 onwards)
+pytesseract==0.3.13
+pdf2image==1.17.0
+Pillow==11.3.0
+
+# NLP extraction of applicant fields from free-form email bodies.
+# The en_core_web_sm model is installed in the Dockerfile.
+spacy==3.8.2
+
+# Phone-number parsing/validation (Google's libphonenumber).
+phonenumbers==8.13.55
+
+# Testing
+pytest==8.4.1
+pytest-django==4.11.1
