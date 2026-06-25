@@ -17,7 +17,7 @@ Built with **Django + Django Ninja**, **PostgreSQL**, **Redis**, **Celery**
 | Specs of each component | [`docs/SPECS.md`](docs/SPECS.md) |
 | Working backend code | `onboarding/`, `config/` (run via Docker; tests in `tests/`) |
 | Docker setup | `docker-compose.yml`, `Dockerfile`, `docker/entrypoint.sh` |
-| Database schema | [`docs/schema.md`](docs/schema.md) (ER diagram + tables) |
+| Database schema | [`docs/schema.md`](docs/schema.md) (ER diagram + tables; rendered [`schema.png`](docs/schema.png)/[`.svg`](docs/schema.svg)) |
 | API endpoints | [API reference](#api-reference) below + Swagger at `/api/docs` |
 | Sample test requests | [`samples/sample_emails.md`](samples/sample_emails.md), `requests.http`, `samples/` |
 | README (architecture) | this file; flow diagram in [`docs/end_to_end_flow.mmd`](docs/end_to_end_flow.mmd) |
@@ -167,9 +167,10 @@ delivery, set `EMAIL_BACKEND` to the SMTP backend and the `EMAIL_HOST*` vars
 docker compose exec web pytest
 ```
 
-**30 tests.** Unit tests cover document field extraction (Aadhaar/PAN/DOB/address,
+**32 tests.** Unit tests cover document field extraction (Aadhaar/PAN/DOB/address,
 Verhoeff checksum) and free-form body parsing (`phonenumbers`, `From:`-header
-capture); DB tests cover idempotency, thread detection, sender capture, the
+capture, Message-ID not mistaken for the applicant email); DB tests cover idempotency,
+thread detection (incl. reply-with-deleted-parent → 409), sender capture, the
 validation workflow (name/address mismatch, duplicate-document detection, the
 `ticket_created` event), and the read/admin API surface.
 

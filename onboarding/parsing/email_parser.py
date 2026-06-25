@@ -26,6 +26,11 @@ PHONE_RE = re.compile(r"(?<!\d)(?:\+91[-\s]?|0)?([6-9]\d{9})(?!\d)")
 # Looser candidate: digit runs that may contain spaces/dashes (e.g. 98765 43210).
 PHONE_CANDIDATE_RE = re.compile(r"(?<!\d)(?:\+?91[-\s]?)?[6-9][\d\s-]{8,13}\d(?!\d)")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w-]+")
+# Header lines whose values look like addresses but are message identifiers,
+# not the applicant's email - scrubbed before scanning the body for an address.
+_ID_HEADER_LINE_RE = re.compile(
+    r"^\s*(?:Message-ID|In-Reply-To|References)\s*:.*$", re.IGNORECASE | re.MULTILINE
+)
 ADDRESS_PHRASE_RE = re.compile(
     r"(?:live[sd]?|living|stay(?:ing)?|reside[sd]?|residing|located|address)\s*"
     r"(?:at|in|is|:|=)?\s*([^.\n]+)",
@@ -144,7 +149,10 @@ def _extract_phone_regex(body: str) -> str:
 
 
 def _extract_email(body: str, from_addr: str) -> str:
-    m = EMAIL_RE.search(body)
+    # Drop Message-ID/In-Reply-To/References lines first - their values look
+    # like addresses but are not the applicant's email.
+    scrubbed = _ID_HEADER_LINE_RE.sub("", body or "")
+    m = EMAIL_RE.search(scrubbed)
     if m:
         return m.group(0).strip(".,;:)")
     return from_addr or ""

@@ -1,0 +1,95 @@
+erDiagram
+    RAW_EMAIL ||--o{ TICKET : "raw_email (PROTECT)"
+    TICKET ||--o{ RAW_EMAIL : "thread_ticket (SET_NULL)"
+    TICKET ||--o{ DOCUMENT : "documents"
+    TICKET ||--o{ TICKET_EVENT : "events"
+    TICKET ||--o{ NOTIFICATION : "notifications"
+    TICKET ||--o{ VALIDATION_RESULT : "validation_results"
+    TICKET ||--o{ IDEMPOTENCY_KEY : "idempotency_keys"
+    TICKET ||--o{ DEAD_LETTER : "dead_letters"
+
+    RAW_EMAIL {
+        bigint id PK
+        varchar content_hash UK "sha256 of body + attachments"
+        varchar message_id UK "nullable"
+        varchar in_reply_to "indexed, nullable"
+        text references "nullable"
+        email from_addr
+        text body_text
+        json raw_payload
+        bigint thread_ticket_id FK "nullable"
+        datetime received_at
+    }
+
+    TICKET {
+        bigint id PK
+        varchar ticket_ref UK "TKT-XXXXXXXX"
+        varchar status "indexed enum"
+        bigint raw_email_id FK
+        varchar applicant_name
+        email applicant_email "indexed"
+        varchar applicant_phone "indexed"
+        text applicant_address
+        date applicant_dob "nullable"
+        int applicant_age "nullable"
+        json parsed_source "email vs document fields"
+        datetime sla_due_at "indexed, nullable"
+        bool sla_breached
+    }
+
+    DOCUMENT {
+        bigint id PK
+        bigint ticket_id FK
+        varchar filename
+        varchar content_type "pdf|jpg|png"
+        bigint size_bytes
+        varchar sha256 "indexed; unique per ticket"
+        varchar storage_path
+        varchar status "uploaded|parsed|invalid"
+        json metadata
+        json extracted_fields
+    }
+
+    TICKET_EVENT {
+        bigint id PK
+        bigint ticket_id FK
+        varchar event_type "indexed enum"
+        varchar message
+        json payload
+        datetime created_at
+    }
+
+    NOTIFICATION {
+        bigint id PK
+        bigint ticket_id FK
+        varchar channel
+        varchar template
+        varchar to_addr
+        varchar status "queued|sent|failed"
+        datetime sent_at "nullable"
+    }
+
+    VALIDATION_RESULT {
+        bigint id PK
+        bigint ticket_id FK
+        varchar check_name "indexed"
+        bool passed
+        json detail
+        datetime created_at
+    }
+
+    IDEMPOTENCY_KEY {
+        bigint id PK
+        varchar key UK
+        bigint ticket_id FK
+        datetime created_at
+    }
+
+    DEAD_LETTER {
+        bigint id PK
+        bigint ticket_id FK
+        varchar task_name "indexed"
+        text error
+        bool reprocessed "indexed"
+        datetime created_at
+    }

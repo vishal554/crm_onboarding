@@ -57,6 +57,18 @@ def test_parse_from_header_name_and_address():
     assert parse_from_header("bare@example.com") == ("", "bare@example.com")
 
 
+def test_message_id_not_picked_as_applicant_email():
+    # The Message-ID value looks like an address but must not become the email;
+    # the real address comes from the From header.
+    body = (
+        "Message-ID: <onboard-meera-100@example.com>\n"
+        "In-Reply-To: <thread-99@example.com>\n"
+        "From: Meera Iyer <meera.iyer@example.com>\n\n"
+        "Following up on my onboarding request."
+    )
+    assert parse_email_body(body)["email"] == "meera.iyer@example.com"
+
+
 def test_name_and_email_fall_back_to_from_header():
     # No name/email stated in the prose - both come "from mail".
     body = "From: Rahul Sharma <rahul@example.com>\n\nPlease onboard me."

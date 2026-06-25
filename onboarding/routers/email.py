@@ -74,6 +74,11 @@ def email_inbound(
 
     ticket, outcome = ingest_and_enqueue(payload)
 
+    if ticket is None:
+        # Idempotent replay of an email whose ticket was since removed
+        # (e.g. a reply whose original ticket was deleted out of band).
+        raise HttpError(409, "Duplicate email; the original ticket no longer exists.")
+
     messages = {
         "created": "Onboarding ticket created; processing started.",
         "reply": f"Reply mapped to existing ticket {ticket.ticket_ref}.",

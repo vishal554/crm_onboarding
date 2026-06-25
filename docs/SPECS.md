@@ -59,8 +59,9 @@ See also: [`schema.md`](schema.md) (data model), [`end_to_end_flow.mmd`](end_to_
 - **I/O:** in — `body: str`, `attachments: list[UploadedFile]`; out — `IngestResponse`
   (`ticket_id`, `status`, `idempotent`, `message`).
 - **Invariants:** rate-limited per client; rejects unsupported types (422) and
-  oversized files (413); the handler is **synchronous** (WSGI) for robust multipart
-  handling — heavy work is delegated to Celery.
+  oversized files (413); a duplicate replay whose ticket was since removed returns a
+  clean **409** (never a 500); the handler is **synchronous** (WSGI) for robust
+  multipart handling — heavy work is delegated to Celery.
 
 ### `tickets.py` — read + admin
 - **Responsibility:** `GET /tickets` (paginated, `?status=`), `GET /tickets/{id}`,
@@ -92,8 +93,9 @@ See also: [`schema.md`](schema.md) (data model), [`end_to_end_flow.mmd`](end_to_
 - **Responsibility:** extract `name`, `email`, `phone`, `address` from free-form prose
   or `Label: value` lines; parse inline `Message-ID`/`In-Reply-To`/`References`/`From`
   headers.
-- **Strategy / invariants:** explicit `Label:` lines win; **email** via regex with the
-  `From:` address as fallback; **phone** via `phonenumbers` (libphonenumber, region
+- **Strategy / invariants:** explicit `Label:` lines win; **email** via regex (skipping
+  `Message-ID`/`In-Reply-To`/`References` lines so their ids aren't mistaken for an
+  address) with the `From:` address as fallback; **phone** via `phonenumbers` (libphonenumber, region
   `IN`, validated → national number) with a regex fallback; **name** via spaCy
   `PERSON` NER → phrase regex → `From:` display name; **address** via phrase regex →
   spaCy GPE/LOC.
@@ -122,7 +124,9 @@ See also: [`schema.md`](schema.md) (data model), [`end_to_end_flow.mmd`](end_to_
 - **I/O:** in — `ticket_id`; out — side effects (Documents, parsed fields, validation
   results, queued notifications), each stage returns `ticket_id` to the next.
 - **Invariants:** stages subclass `PipelineTask`; attachment extraction is
-  hash-deduped and idempotent (safe to re-run on reprocess).
+  hash-deduped and idempotent (safe to re-run on reprocess); the document's DOB/age
+  populate the ticket, and its address back-fills `applicant_address` when the email
+  gave none (email input still wins when present).
 
 ### `base.py` — `PipelineTask`
 - **Responsibility:** base task giving auto-retry (3×, exponential backoff + jitter)

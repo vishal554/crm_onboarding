@@ -190,6 +190,10 @@ def run_document_extraction(ticket_id: int) -> int:
             ticket.applicant_dob = date.fromisoformat(merged["dob"])
         if merged.get("age") is not None:
             ticket.applicant_age = merged["age"]
+        # Address is the user's mail input, verified against the Aadhaar - but
+        # when the email gives no address, fall back to the document's.
+        if merged.get("address") and not ticket.applicant_address:
+            ticket.applicant_address = merged["address"]
         ticket.save()
 
     if ticket.documents.exists():

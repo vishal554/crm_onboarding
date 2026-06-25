@@ -34,6 +34,22 @@ def test_list_and_detail():
 
 
 @pytest.mark.django_db
+def test_duplicate_reply_with_deleted_parent_returns_409_not_500():
+    # Reply threads onto an original ticket; if that ticket is later deleted,
+    # resending the reply must return a clean 409, not crash with a 500.
+    client = Client()
+    client.post(
+        "/api/email/inbound",
+        {"body": "Message-ID: <mx@mail>\nI am Sam, sam@example.com, 9111100000"},
+    )
+    client.post("/api/email/inbound", {"body": "In-Reply-To: <mx@mail>\nfollowing up"})
+    Ticket.objects.all().delete()
+
+    resp = client.post("/api/email/inbound", {"body": "In-Reply-To: <mx@mail>\nfollowing up"})
+    assert resp.status_code == 409
+
+
+@pytest.mark.django_db
 def test_status_update_requires_admin_key():
     client = Client()
     client.post("/api/email/inbound", {"body": "hello"})

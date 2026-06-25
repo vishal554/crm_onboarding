@@ -7,6 +7,9 @@ regardless of application logic.
 
 ## Entity-relationship diagram
 
+Rendered image (for viewers without Mermaid): [`schema.png`](schema.png) (high-res) ·
+[`schema.svg`](schema.svg) (vector). Source: [`schema.mmd`](schema.mmd).
+
 ```mermaid
 erDiagram
     RAW_EMAIL ||--o{ TICKET : "raw_email (PROTECT)"
