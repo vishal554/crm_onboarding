@@ -5,7 +5,6 @@ erDiagram
     TICKET ||--o{ TICKET_EVENT : "events"
     TICKET ||--o{ NOTIFICATION : "notifications"
     TICKET ||--o{ VALIDATION_RESULT : "validation_results"
-    TICKET ||--o{ IDEMPOTENCY_KEY : "idempotency_keys"
     TICKET ||--o{ DEAD_LETTER : "dead_letters"
 
     RAW_EMAIL {
@@ -75,13 +74,6 @@ erDiagram
         varchar check_name "indexed"
         bool passed
         json detail
-        datetime created_at
-    }
-
-    IDEMPOTENCY_KEY {
-        bigint id PK
-        varchar key UK
-        bigint ticket_id FK
         datetime created_at
     }
 

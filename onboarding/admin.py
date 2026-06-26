@@ -9,7 +9,6 @@ from django.contrib import admin
 from .models import (
     DeadLetter,
     Document,
-    IdempotencyKey,
     Notification,
     RawEmail,
     Ticket,
@@ -98,12 +97,6 @@ class ValidationResultAdmin(admin.ModelAdmin):
     list_display = ("id", "ticket", "check_name", "passed", "created_at")
     list_filter = ("passed", "check_name")
     search_fields = ("ticket__ticket_ref",)
-
-
-@admin.register(IdempotencyKey)
-class IdempotencyKeyAdmin(admin.ModelAdmin):
-    list_display = ("key", "ticket", "created_at")
-    search_fields = ("key", "ticket__ticket_ref")
 
 
 @admin.register(DeadLetter)

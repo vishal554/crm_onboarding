@@ -5,7 +5,6 @@ what make the system idempotent and deduplicated regardless of app logic:
 
 * ``RawEmail.message_id`` / ``RawEmail.content_hash`` - one ticket per email.
 * ``Document.sha256``                                  - attachment dedup.
-* ``IdempotencyKey.key``                               - safe request retries.
 """
 
 import uuid
@@ -253,19 +252,3 @@ class DeadLetter(models.Model):
 
     def __str__(self):
         return f"DLQ {self.ticket_id}:{self.task_name}"
-
-
-class IdempotencyKey(models.Model):
-    """Maps a request/email dedup key to the ticket it produced."""
-
-    key = models.CharField(max_length=128, unique=True, db_index=True)
-    ticket = models.ForeignKey(
-        Ticket, on_delete=models.CASCADE, related_name="idempotency_keys"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "idempotency_keys"
-
-    def __str__(self):
-        return self.key

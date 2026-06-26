@@ -38,12 +38,11 @@ See also: [`schema.md`](schema.md) (data model), [`end_to_end_flow.mmd`](end_to_
 ---
 
 ## `onboarding/models.py` — data model
-- **Responsibility:** the 8 entities (`RawEmail`, `Ticket`, `Document`, `TicketEvent`,
-  `Notification`, `ValidationResult`, `IdempotencyKey`, `DeadLetter`) and enums
+- **Responsibility:** the 7 entities (`RawEmail`, `Ticket`, `Document`, `TicketEvent`,
+  `Notification`, `ValidationResult`, `DeadLetter`) and enums
   (`TicketStatus`, `DocumentType`, `DocumentStatus`, `NotificationStatus`, `EventType`).
 - **Invariants (DB-level, what makes the system correct regardless of app logic):**
   - `raw_emails.content_hash` **unique** → one ticket per distinct email (idempotency).
-  - `idempotency_keys.key` **unique** → safe request replays.
   - `documents (ticket, sha256)` **unique** → per-ticket attachment dedup.
   - `tickets.ticket_ref` **unique**, human-friendly (`TKT-XXXXXXXX`).
   - `TERMINAL_TICKET_STATUSES = {approved, rejected}` (excluded from SLA/reprocess).
@@ -77,7 +76,7 @@ See also: [`schema.md`](schema.md) (data model), [`end_to_end_flow.mmd`](end_to_
 
 | Service | Responsibility | Key invariants |
 |---------|----------------|----------------|
-| `ingestion.py` | Hash the email, enforce idempotency, detect replies, create `RawEmail`+`Ticket`+`IdempotencyKey`, enqueue pipeline. Captures sender from the in-body `From:` header. | Single `@transaction.atomic` + `get_or_create` on `content_hash` → race-safe idempotency. Pipeline enqueued only `on_commit` and only for new tickets. Emits `email_received` + `ticket_created`. |
+| `ingestion.py` | Hash the email, enforce idempotency, detect replies, create `RawEmail`+`Ticket`, enqueue pipeline. Captures sender from the in-body `From:` header. | Single `@transaction.atomic` + `get_or_create` on `content_hash` → race-safe idempotency. Pipeline enqueued only `on_commit` and only for new tickets. Emits `email_received` + `ticket_created`. |
 | `dedupe.py` | `find_duplicate(ticket)` — earliest *other* ticket matching applicant email, phone, document number, **or shared document hash**. | Only matches tickets with a lower id (the first of a pair stays clean). |
 | `validation.py` | Run checks (required doc, format, name/age/**address** consistency, duplicate) and resolve terminal status. | Missing docs → `rejected`; any mismatch/duplicate/bad-format → `requires_manual_review`; all pass → `approved`. Persists a `ValidationResult` per check. |
 | `storage.py` | Hash-addressed local attachment storage; base64 decode; magic-byte format sniffing. | Identical bytes stored once on disk (`sha256[:2]/sha256.ext`). `sniff_format` validates by magic bytes, not extension. |

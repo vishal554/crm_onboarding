@@ -9,7 +9,7 @@ flowchart TD
     F -->|Yes| F1["Return existing ticket<br/>idempotent = true"]:::done
     F -->|No| G{"Reply?<br/>In-Reply-To matches"}
     G -->|Yes| G1["Map onto original ticket<br/>add reply event"]:::done
-    G -->|No| H["Create RawEmail + Ticket received<br/>+ IdempotencyKey + sla_due_at"]
+    G -->|No| H["Create RawEmail + Ticket received<br/>+ sla_due_at"]
     H --> I[("Enqueue pipeline<br/>Redis broker")]
 
     I --> J["1. store_raw_email<br/>status: processing"]

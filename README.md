@@ -106,10 +106,9 @@ Then user **notifications** are queued and sent on the `notifications` queue. A
 | `ticket_events` | immutable **timeline** / processing log |
 | `notifications` | queued/sent user notifications |
 | `validation_results` | per-check outcomes |
-| `idempotency_keys` | dedup key → ticket |
 | `dead_letters` | tasks that failed after retries (**DLQ**), `reprocessed` flag |
 
-DB-level uniqueness (content hash, idempotency key) is what makes ingestion
+DB-level uniqueness (content hash) is what makes ingestion
 **race-safe idempotent**, not just app logic.
 
 ---

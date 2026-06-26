@@ -40,7 +40,7 @@ docker compose down               # stop
   (Celery app + Beat schedule), `settings.py` (env-driven).
 - **`onboarding/`** — the app.
   - `models.py` — RawEmail, Ticket, Document, TicketEvent, Notification,
-    ValidationResult, IdempotencyKey, DeadLetter. PostgreSQL is the source of truth.
+    ValidationResult, DeadLetter. PostgreSQL is the source of truth.
   - `routers/` — `email.py` (`POST /email/inbound`), `tickets.py` (list/detail/
     timeline/documents/status/reprocess).
   - `services/` — `ingestion.py`, `dedupe.py`, `validation.py`, `storage.py`,

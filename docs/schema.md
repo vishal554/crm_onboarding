@@ -18,7 +18,6 @@ erDiagram
     TICKET ||--o{ TICKET_EVENT : "events"
     TICKET ||--o{ NOTIFICATION : "notifications"
     TICKET ||--o{ VALIDATION_RESULT : "validation_results"
-    TICKET ||--o{ IDEMPOTENCY_KEY : "idempotency_keys"
     TICKET ||--o{ DEAD_LETTER : "dead_letters"
 
     RAW_EMAIL {
@@ -88,13 +87,6 @@ erDiagram
         varchar check_name "indexed"
         bool passed
         json detail
-        datetime created_at
-    }
-
-    IDEMPOTENCY_KEY {
-        bigint id PK
-        varchar key UK
-        bigint ticket_id FK
         datetime created_at
     }
 
@@ -197,14 +189,6 @@ Per-check outcome of a validation run.
 | `detail` | json | check-specific context |
 | `created_at` | datetime | auto add |
 
-### `idempotency_keys`
-Maps a request/email dedup key to the ticket it produced.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `key` | varchar(128) | **unique**, indexed |
-| `ticket_id` | FK→tickets | `CASCADE` |
-
 ### `dead_letters`
 A pipeline task that failed after exhausting retries (the DLQ).
 
@@ -231,7 +215,6 @@ A pipeline task that failed after exhausting retries (the DLQ).
 
 - `raw_emails.content_hash` **unique** → one ticket per distinct email (idempotency,
   race-safe via `get_or_create` in a single transaction).
-- `idempotency_keys.key` **unique** → safe request replays.
 - `documents (ticket, sha256)` **unique** → per-ticket attachment dedup; cross-ticket
   duplicate identity documents are caught at validation time by hash match, not by this
   constraint.

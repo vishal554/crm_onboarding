@@ -16,7 +16,6 @@ from django.utils import timezone
 
 from onboarding.models import (
     EventType,
-    IdempotencyKey,
     RawEmail,
     Ticket,
     TicketStatus,
@@ -127,7 +126,6 @@ def ingest_email(payload):
         EventType.TICKET_CREATED,
         f"Onboarding ticket {ticket.ticket_ref} created",
     )
-    IdempotencyKey.objects.create(key=content_hash, ticket=ticket)
     return ticket, "created"
 
 

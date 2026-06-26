@@ -1,0 +1,78 @@
+flowchart TB
+    subgraph CLIENT["Clients"]
+        EMAIL["Inbound email provider<br/>(body + attachments)"]
+        OPS["Admin / Ops"]
+    end
+
+    subgraph API["API tier — Django + Django Ninja (gunicorn / WSGI, synchronous)"]
+        RL["Rate limiter<br/>Redis fixed-window"]
+        INGEST["POST /api/email/inbound<br/>ingestion service"]
+        READ["GET /tickets · /timeline · /documents<br/>(open read APIs)"]
+        ADMINAPI["PATCH /status · POST /reprocess<br/>X-Admin-Key auth"]
+        HEALTH["GET /api/health"]
+        DJADMIN["Django admin /admin/"]
+    end
+
+    subgraph DATA["Data tier"]
+        PG[("PostgreSQL<br/>source of truth")]
+        REDIS[("Redis<br/>broker + rate-limit")]
+        STORE[["Local storage<br/>hash-addressed attachments"]]
+    end
+
+    subgraph WORKER["Async workers — Celery (queues: ingest · pipeline · ocr · notifications · dead_letter)"]
+        Q{{"Broker consumes<br/>queued tasks"}}
+        subgraph PIPE["Onboarding pipeline chain — PipelineTask: auto-retry then DLQ"]
+            S1["1 store_raw_email"]
+            S2["2 extract_attachments<br/>hash-dedupe + store"]
+            S3["3 parse_user_info"]
+            S4["4 run_document_extraction<br/>OCR"]
+            S5["5 run_validation"]
+        end
+        NOTIF["send_notification"]
+        BEAT["Celery Beat<br/>check_sla (periodic)"]
+        DLQ["record_dead_letter"]
+    end
+
+    subgraph LIB["Extraction libraries"]
+        SPACY["spaCy NER"]
+        PHONE["phonenumbers"]
+        TESS["Tesseract + poppler"]
+    end
+
+    MAIL["Email backend<br/>console / SMTP"]
+
+    %% --- request path ---
+    EMAIL -->|multipart POST| RL --> INGEST
+    OPS --> ADMINAPI
+    OPS --> READ
+    OPS --> DJADMIN
+    RL <-->|counter| REDIS
+
+    INGEST -->|RawEmail + Ticket<br/>idempotent get_or_create| PG
+    INGEST -->|enqueue on_commit| REDIS
+    READ --> PG
+    ADMINAPI --> PG
+    ADMINAPI -->|reprocess| REDIS
+    DJADMIN --> PG
+    HEALTH --> PG
+
+    %% --- async path ---
+    REDIS --> Q --> S1 --> S2 --> S3 --> S4 --> S5
+    S2 --> STORE
+    S3 --> SPACY
+    S3 --> PHONE
+    S4 --> TESS
+    S4 --> STORE
+    S1 & S2 & S3 & S4 & S5 -->|status + timeline events| PG
+    S3 -.->|queue| NOTIF
+    S4 -.->|queue| NOTIF
+    S5 -.->|queue| NOTIF
+    NOTIF --> MAIL
+    NOTIF --> PG
+    BEAT -->|flag SLA breaches| PG
+    PIPE -.->|retries exhausted| DLQ --> PG
+
+    classDef store fill:#eef2ff,stroke:#6366f1,color:#111;
+    classDef ext fill:#ecfdf5,stroke:#10b981,color:#111;
+    class PG,REDIS,STORE store;
+    class SPACY,PHONE,TESS,MAIL ext;
