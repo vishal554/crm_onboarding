@@ -86,7 +86,7 @@ ticket `status` and appends a timeline event, and retries/recovers independently
 | 2 | `extract_attachments` | pipeline | decode, validate, **hash-dedupe**, store, create `Document`s |
 | 3 | `parse_user_info` | pipeline | extract name/email/phone/address from the body — **spaCy NER** + regex, **`phonenumbers`** for phone, sender from the `From:` header |
 | 4 | `run_document_extraction` | ocr | **Tesseract OCR** → Aadhaar/PAN/DOB/name/**address**; derive age |
-| 5 | `run_validation` | pipeline | required docs, format, **name/age/address consistency** (email vs document), **duplicate detection** (email/phone/doc-number/**doc-hash**) → resolve status |
+| 5 | `run_validation` | pipeline | required docs, format, **name/age/address consistency** (email vs document), **duplicate detection** (email+phone, plus doc-number/doc-hash when present — all must agree) → resolve status |
 
 Then user **notifications** are queued and sent on the `notifications` queue. A
 **Beat** job periodically flags **SLA breaches**.
@@ -134,7 +134,7 @@ Plus the **Django admin** at `/admin/` for full ops on every model.
 **Core (1–11):** email ingestion · async worker pipeline · ticket state machine ·
 document handling + hash dedup · OCR document parsing (incl. **Aadhaar address**) ·
 validation workflow (name/age/**address** consistency) · async notifications ·
-duplicate detection (email/phone/doc-number/**doc-hash**) · idempotent processing ·
+duplicate detection (email+phone + doc-number/doc-hash, all matching) · idempotent processing ·
 high-volume design (dedicated queues, backpressure) · failure handling (retries + DLQ).
 
 **Additional mandatory:** ticket timeline · email thread detection (reply→original
@@ -186,9 +186,10 @@ validation workflow (name/address mismatch, duplicate-document detection, the
   model behind the same function for higher accuracy. **Phone numbers** are parsed
   and validated with **`phonenumbers`** (libphonenumber); name/email fall back to the
   inbound `From:` header ("from mail") when the prose doesn't state them.
-- **Duplicate detection** spans applicant email, phone, document number, and the
-  **document content hash** — so the same identity document submitted under a
-  different applicant is flagged for manual review.
+- **Duplicate detection** requires *all shared details* to agree: the identity
+  (applicant **email and phone**) must match, plus the **document number** and a
+  shared **document hash** when both tickets carry them. A single coincidental
+  match (e.g. a shared phone alone) is not enough; matches route to manual review.
 - **Address** is read from the Aadhaar and reconciled against the email-provided
   address (token-overlap comparison, tolerant of formatting differences).
 - The HTTP layer is synchronous (WSGI) for robust multipart handling; the

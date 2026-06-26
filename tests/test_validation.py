@@ -13,11 +13,16 @@ from onboarding.models import (
 from onboarding.services.validation import run_validation
 
 
-def _ticket(content_hash, parsed_source=None):
+def _ticket(content_hash, parsed_source=None, email="", phone=""):
     raw = RawEmail.objects.create(
         content_hash=content_hash, body_text="", received_at=timezone.now()
     )
-    return Ticket.objects.create(raw_email=raw, parsed_source=parsed_source or {})
+    return Ticket.objects.create(
+        raw_email=raw,
+        parsed_source=parsed_source or {},
+        applicant_email=email,
+        applicant_phone=phone,
+    )
 
 
 def _add_doc(ticket, sha):
@@ -97,22 +102,46 @@ def test_matching_address_approved():
 
 
 @pytest.mark.django_db
-def test_duplicate_identity_document_routes_to_manual_review():
-    # Same document bytes (hash) submitted under two different applicants:
-    # the first stays clean, the second must be flagged as a duplicate.
-    shared_sha = "shared-doc-sha"
-    first = _ticket(
-        "val-4a",
-        {"email": {"name": "Jane Smith"}, "document": {"name": "Jane Smith"}},
-    )
-    _add_doc(first, shared_sha)
+def test_same_applicant_resubmission_is_duplicate():
+    # Same applicant (email + phone) and same document -> flagged as duplicate.
+    src = {"email": {"name": "Jane Smith"}, "document": {"name": "Jane Smith"}}
+    first = _ticket("val-4a", src, email="jane@example.com", phone="9000000001")
+    _add_doc(first, "shared-sha")
     assert run_validation(first)[0] == TicketStatus.APPROVED
 
-    second = _ticket(
-        "val-4b",
-        {"email": {"name": "Bob Brown"}, "document": {"name": "Bob Brown"}},
-    )
-    _add_doc(second, shared_sha)
+    second = _ticket("val-4b", src, email="jane@example.com", phone="9000000001")
+    _add_doc(second, "shared-sha")
     status, _event, _msg, duplicate = run_validation(second)
     assert status == TicketStatus.REQUIRES_MANUAL_REVIEW
     assert duplicate is not None and duplicate.id == first.id
+
+
+@pytest.mark.django_db
+def test_same_document_different_applicant_not_duplicate():
+    # Same document bytes but a different applicant (email + phone differ):
+    # under the all-details rule this is NOT a duplicate.
+    src = {"email": {"name": "Jane Smith"}, "document": {"name": "Jane Smith"}}
+    first = _ticket("val-5a", src, email="jane@example.com", phone="9000000001")
+    _add_doc(first, "shared-sha-2")
+    assert run_validation(first)[0] == TicketStatus.APPROVED
+
+    bob = {"email": {"name": "Bob Brown"}, "document": {"name": "Bob Brown"}}
+    second = _ticket("val-5b", bob, email="bob@example.com", phone="9000000002")
+    _add_doc(second, "shared-sha-2")
+    status, _event, _msg, duplicate = run_validation(second)
+    assert status == TicketStatus.APPROVED
+    assert duplicate is None
+
+
+@pytest.mark.django_db
+def test_shared_phone_alone_not_duplicate():
+    # Same phone but different email is not enough -> not a duplicate.
+    src = {"email": {"name": "Jane Smith"}, "document": {"name": "Jane Smith"}}
+    first = _ticket("val-6a", src, email="jane@example.com", phone="9000000009")
+    _add_doc(first, "sha-6a")
+    assert run_validation(first)[0] == TicketStatus.APPROVED
+
+    second = _ticket("val-6b", src, email="other@example.com", phone="9000000009")
+    _add_doc(second, "sha-6b")
+    status, *_ = run_validation(second)
+    assert status == TicketStatus.APPROVED

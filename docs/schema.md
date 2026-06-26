@@ -215,8 +215,8 @@ A pipeline task that failed after exhausting retries (the DLQ).
 
 - `raw_emails.content_hash` **unique** → one ticket per distinct email (idempotency,
   race-safe via `get_or_create` in a single transaction).
-- `documents (ticket, sha256)` **unique** → per-ticket attachment dedup; cross-ticket
-  duplicate identity documents are caught at validation time by hash match, not by this
-  constraint.
+- `documents (ticket, sha256)` **unique** → per-ticket attachment dedup. Cross-ticket
+  duplicate detection happens at validation time (`find_duplicate`), and the shared
+  document hash is only one of the signals that must agree (alongside email + phone).
 - `tickets.raw_email` uses `PROTECT`; all per-ticket children use `CASCADE`;
   `raw_emails.thread_ticket` uses `SET_NULL`.
